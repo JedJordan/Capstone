@@ -1,0 +1,23 @@
+/* Game.css */
+.game-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh; /* Adjust as needed */
+    text-align: center;
+}
+
+.audio-player {
+    width: 80%; /* Adjust the width as needed */
+    max-width: 400px; /* Set a maximum width */
+    margin-bottom: 20px;
+}
+
+.guess-input {
+    width: 50%; /* Set the desired width (e.g., 50% for half the size) */
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
