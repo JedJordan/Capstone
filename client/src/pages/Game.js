@@ -13,11 +13,17 @@ function Game() {
   const [gameStarted, setGameStarted] = useState(false);
   const [usersInRoom, setUsersInRoom] = useState([]);
   const audioRef = useRef(null);
+  const [scores, setScores] = useState({});
+  const [remainingTime, setRemainingTime] = useState(30);
 
-  const handleStartGame = () => {
+  /*const handleStartGame = () => {
     setGameStarted(true);
     const roomName = 'GameRoom';
     socket.emit('startGame', roomName);
+  };*/
+
+  const handleStartGame = () => {
+    socket.emit('startGame', 'GameRoom');
   };
 
   useEffect(() => {
@@ -31,14 +37,25 @@ function Game() {
       setSongUrl(url);
     });
 
+    socket.on('startGame', (answersData) => {
+        setGameStarted(true);
+        setAnswers(answersData);
+      });
+
+    socket.on('scores', (scoresData) => {
+        setScores(scoresData.reduce((acc, user) => {
+          acc[user.userId] = user.score;
+          return acc;
+        }, {}));
+      });
+
     socket.on('result', (result) => {
-      setMessage(result);
-      if (result === 'Correct!') {
-        // Autoplay the next song after a correct guess
-        setTimeout(() => {
-          audioRef.current.play();
-        }, 1000); // Delay the autoplay by 1 second (adjust as needed)
-      }
+        setMessage(result);
+        if (result === 'Correct!' || result === 'Time is up! Moving to the next song.') {
+            setTimeout(() => {
+            audioRef.current.play();
+            }, 1000);
+        }
     });
 
     socket.on('end', (endMessage) => {
@@ -49,12 +66,19 @@ function Game() {
       setAnswers(answersData);
     });
 
+    socket.on('timer', (time) => {
+        setRemainingTime(time);
+    });
+
     return () => {
-      socket.off('song');
-      socket.off('result');
-      socket.off('end');
-      socket.off('answers');
-      socket.off('usersInRoom')
+        socket.off('song');
+        socket.off('result');
+        socket.off('end');
+        socket.off('answers');
+        socket.off('usersInRoom');
+        socket.off('scores');
+        socket.off('startGame');
+        socket.off('timer');
     };
   }, []);
 
@@ -78,8 +102,10 @@ function Game() {
           Start Game
         </button>
       )}
+      
       {gameStarted && (
         <>
+        <div className="timer">Time remaining: {remainingTime} seconds</div>
           <input
             type="text"
             value={guess}
@@ -101,8 +127,10 @@ function Game() {
       <div className="users-in-room">
         <h3>Users in Room:</h3>
         <ul>
-          {usersInRoom.map((user, index) => (
-            <li key={index}>{user}</li>
+          {usersInRoom.map((user) => (
+            <li key={user.userId}>
+              {user.userId}: {scores[user.userId] || 0} points
+            </li>
           ))}
         </ul>
       </div>
