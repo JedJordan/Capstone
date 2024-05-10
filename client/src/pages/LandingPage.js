@@ -7,8 +7,8 @@ function LandingPage() {
   return (
     <div className="landing-page-container">
       <h1 className="welcome-text">Name that Anime Tune!</h1>
-      <Link to="/game" className="start-game-button">
-        Start Game
+      <Link to="/game" className="join-room-button">
+        Join Room
       </Link>
     </div>
   );

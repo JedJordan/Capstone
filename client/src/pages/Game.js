@@ -5,6 +5,8 @@ import './Game.css';
 
 const socket = io('http://localhost:4000');
 
+//const socket = io('http://192.168.56.1:4000');
+
 function Game() {
   const [songUrl, setSongUrl] = useState('');
   const [guess, setGuess] = useState('');
@@ -13,49 +15,57 @@ function Game() {
   const [gameStarted, setGameStarted] = useState(false);
   const [usersInRoom, setUsersInRoom] = useState([]);
   const audioRef = useRef(null);
-  const [scores, setScores] = useState({});
   const [remainingTime, setRemainingTime] = useState(30);
+  const [username, setUsername] = useState('');
+  const [isReady, setIsReady] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [currentSongIndex, setCurrentSongIndex] = useState(0);
+  const [totalSongs, setTotalSongs] = useState(0);
+  const [hasStartedTyping, setHasStartedTyping] = useState(false);
 
-  /*const handleStartGame = () => {
-    setGameStarted(true);
-    const roomName = 'GameRoom';
-    socket.emit('startGame', roomName);
-  };*/
 
-  const handleStartGame = () => {
-    socket.emit('startGame', 'GameRoom');
+  const handleJoinGame = () => {
+    if (username.trim() !== '') {
+      socket.emit('joinGame', { roomName: 'GameRoom', username });
+      setIsReady(true);
+    }
   };
 
   useEffect(() => {
     socket.emit('joinRoom', 'GameRoom');
 
     socket.on('usersInRoom', (users) => {
-        setUsersInRoom(users);
-      });
+      setUsersInRoom(users);
+    });
 
     socket.on('song', (url) => {
       setSongUrl(url);
     });
 
+    socket.on('songIndex', (index) => {
+        setCurrentSongIndex(index);
+    });
+  
+    socket.on('totalSongs', (total) => {
+        setTotalSongs(total);
+    });
+
     socket.on('startGame', (answersData) => {
-        setGameStarted(true);
-        setAnswers(answersData);
-      });
+      setGameStarted(true);
+      setAnswers(answersData);
+    });
 
     socket.on('scores', (scoresData) => {
-        setScores(scoresData.reduce((acc, user) => {
-          acc[user.userId] = user.score;
-          return acc;
-        }, {}));
-      });
+      setUsersInRoom(scoresData);
+    });
 
     socket.on('result', (result) => {
-        setMessage(result);
-        if (result === 'Correct!' || result === 'Time is up! Moving to the next song.') {
-            setTimeout(() => {
-            audioRef.current.play();
-            }, 1000);
-        }
+      setMessage(result);
+      if (result === 'Correct!' || result === 'Time is up! Moving to the next song.') {
+        setTimeout(() => {
+          audioRef.current.play();
+        }, 1000);
+      }
     });
 
     socket.on('end', (endMessage) => {
@@ -67,24 +77,25 @@ function Game() {
     });
 
     socket.on('timer', (time) => {
-        setRemainingTime(time);
+      setRemainingTime(time);
     });
 
     return () => {
-        socket.off('song');
-        socket.off('result');
-        socket.off('end');
-        socket.off('answers');
-        socket.off('usersInRoom');
-        socket.off('scores');
-        socket.off('startGame');
-        socket.off('timer');
+      socket.off('song');
+      socket.off('result');
+      socket.off('end');
+      socket.off('answers');
+      socket.off('usersInRoom');
+      socket.off('scores');
+      socket.off('startGame');
+      socket.off('timer');
     };
   }, []);
 
   useEffect(() => {
     if (songUrl) {
       audioRef.current.play();
+      setHasStartedTyping(false);
     }
   }, [songUrl]);
 
@@ -93,43 +104,60 @@ function Game() {
     setGuess('');
   };
 
+  const handleGuessChange = (e) => {
+    setGuess(e.target.value);
+    setShowSuggestions(e.target.value !== '');
+    setHasStartedTyping(true);
+  };
 
   return (
     <div className="game-container">
-      <audio ref={audioRef} className="audio-player" src={songUrl} />
-      {!gameStarted && (
-        <button onClick={handleStartGame} className="start-button">
-          Start Game
-        </button>
+      {!isReady && (
+        <div>
+          <input
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Enter your username"
+          />
+          <button onClick={handleJoinGame}>Join Game</button>
+        </div>
       )}
-      
+      {isReady && !gameStarted && <p>Waiting for the game to start...</p>}
       {gameStarted && (
         <>
-        <div className="timer">Time remaining: {remainingTime} seconds</div>
+        <audio ref={audioRef} className="audio-player" src={songUrl} />
+          <div className="game-info">
+            <div className="song-tracker">
+              Current Song: {currentSongIndex + 1} / {totalSongs}
+            </div>
+            <div className="timer">Time remaining: {remainingTime} seconds</div>
+          </div>
           <input
             type="text"
             value={guess}
-            onChange={(e) => setGuess(e.target.value)}
+            onChange={handleGuessChange}
             className="guess-input"
             placeholder="Enter your guess..."
-            list="answer-options"
+            list={showSuggestions ? 'answer-options' : undefined}
           />
-          <datalist id="answer-options">
-            {answers.map((answer, index) => (
-              <option key={index} value={answer} />
-            ))}
-          </datalist>
+          {showSuggestions && hasStartedTyping && (
+            <datalist id="answer-options">
+              {answers.map((answer, index) => (
+                <option key={index} value={answer} />
+              ))}
+            </datalist>
+          )}
           <button onClick={handleGuess}>Guess</button>
         </>
-        
       )}
       <p>{message}</p>
       <div className="users-in-room">
         <h3>Users in Room:</h3>
         <ul>
           {usersInRoom.map((user) => (
-            <li key={user.userId}>
-              {user.userId}: {scores[user.userId] || 0} points
+            <li key={user.username}>
+              {user.username}: {user.score} points
             </li>
           ))}
         </ul>
@@ -139,5 +167,3 @@ function Game() {
 }
 
 export default Game;
-
-
