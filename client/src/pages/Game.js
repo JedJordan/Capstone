@@ -1,5 +1,6 @@
 // Game.js
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import io from 'socket.io-client';
 import './Game.css';
 
@@ -22,7 +23,13 @@ function Game() {
   const [currentSongIndex, setCurrentSongIndex] = useState(0);
   const [totalSongs, setTotalSongs] = useState(0);
   const [hasStartedTyping, setHasStartedTyping] = useState(false);
+  const navigate = useNavigate();
 
+
+  const handleBackToLandingPage = () => {
+    socket.emit('leaveGame', 'GameRoom');
+    navigate('/');
+  };
 
   const handleJoinGame = () => {
     if (username.trim() !== '') {
@@ -111,58 +118,73 @@ function Game() {
   };
 
   return (
-    <div className="game-container">
-      {!isReady && (
-        <div>
-          <input
-            type="text"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Enter your username"
-          />
-          <button onClick={handleJoinGame}>Join Game</button>
-        </div>
-      )}
-      {isReady && !gameStarted && <p>Waiting for the game to start...</p>}
-      {gameStarted && (
-        <>
-        <audio ref={audioRef} className="audio-player" src={songUrl} />
-          <div className="game-info">
-            <div className="song-tracker">
-              Current Song: {currentSongIndex + 1} / {totalSongs}
-            </div>
-            <div className="timer">Time remaining: {remainingTime} seconds</div>
-          </div>
-          <input
-            type="text"
-            value={guess}
-            onChange={handleGuessChange}
-            className="guess-input"
-            placeholder="Enter your guess..."
-            list={showSuggestions ? 'answer-options' : undefined}
-          />
-          {showSuggestions && hasStartedTyping && (
-            <datalist id="answer-options">
-              {answers.map((answer, index) => (
-                <option key={index} value={answer} />
-              ))}
-            </datalist>
-          )}
-          <button onClick={handleGuess}>Guess</button>
-        </>
-      )}
-      <p>{message}</p>
-      <div className="users-in-room">
-        <h3>Users in Room:</h3>
-        <ul>
-          {usersInRoom.map((user) => (
-            <li key={user.username}>
-              {user.username}: {user.score} points
-            </li>
-          ))}
-        </ul>
-      </div>
+<div className="game-container">
+  {isReady && (
+    <div className="top-bar">
+      <button className="back-button" onClick={handleBackToLandingPage}>
+        Back
+      </button>
     </div>
+  )}
+
+  {!isReady && (
+    <div>
+      <input
+        type="text"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="Enter your username"
+      />
+      <button onClick={handleJoinGame}>Join Game</button>
+    </div>
+  )}
+
+  {isReady && !gameStarted && <p>Waiting for the game to start...</p>}
+
+  {gameStarted && (
+    <>
+      <audio ref={audioRef} className="audio-player" src={songUrl} />
+      <div className="game-info-container">
+        <div className="game-info">
+          <div className="song-tracker">
+            Song: {currentSongIndex + 1}/{totalSongs}
+          </div>
+          <div className="timer">Time: {remainingTime}s</div>
+        </div>
+        <div className="users-in-room">
+          <h3>Users:</h3>
+          <ul>
+            {usersInRoom.map((user) => (
+              <li key={user.username}>
+                {user.username}: {user.score}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className="guess-container">
+        <input
+          type="text"
+          value={guess}
+          onChange={handleGuessChange}
+          className="guess-input"
+          placeholder="Enter your guess..."
+          list={showSuggestions ? 'answer-options' : undefined}
+        />
+        {showSuggestions && hasStartedTyping && (
+          <datalist id="answer-options">
+            {answers.map((answer, index) => (
+              <option key={index} value={answer} />
+            ))}
+          </datalist>
+        )}
+        <button onClick={handleGuess}>Guess</button>
+        <p className="message">{message}</p>
+      </div>
+    </>
+  )}
+
+</div>
   );
 }
 

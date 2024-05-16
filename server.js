@@ -75,6 +75,7 @@ let scores = {};
 let gameStarted = {};
 let guessesReceived = {};
 let songTimer = null;
+const songTimers = {};
 let currentSong = {};
 let currentSongIndex = {};
 let playersReady = {};
@@ -163,7 +164,23 @@ io.on('connection', (socket) => {
         }
     });
 
+
+    socket.on('leaveGame', (roomName) => {
+      socket.leave(roomName);
+      delete scores[socket.id];
     
+      if (guessesReceived[roomName]) {
+        guessesReceived[roomName].delete(socket.id);
+      }
+    
+      const room = io.sockets.adapter.rooms.get(roomName);
+      if (room && room.size === 0) {
+        endGame(roomName);
+      } else if (room && room.size === 1) {
+        clearInterval(songTimers[roomName]);
+        delete songTimers[roomName];
+      }
+    });
 
     socket.on('disconnect', () => {
         console.log('User disconnected');
@@ -190,7 +207,7 @@ io.on('connection', (socket) => {
     
       // Randomly select 10 songs from the initial list
       const shuffledSongs = shuffleArray(initialsongs);
-      songs = shuffledSongs.slice(0, 10);
+      songs = shuffledSongs.slice(0, 5);
     
       const answers = initialsongs.map((song) => song.answer);
       io.to(roomName).emit('startGame', answers);
@@ -218,17 +235,19 @@ io.on('connection', (socket) => {
     }
 
     function startSongTimer(roomName) {
-        let remainingTime = 30;
-        
-        songTimer = setInterval(() => {
-            remainingTime--;
-            io.to(roomName).emit('timer', remainingTime);
-        
-            if (remainingTime <= 0) {
-            moveToNextSong(roomName);
-            }
-        }, 1000);
+      let remainingTime = 30;
+    
+      songTimers[roomName] = setInterval(() => {
+        remainingTime--;
+        io.to(roomName).emit('timer', remainingTime);
+    
+        if (remainingTime <= 0) {
+          moveToNextSong(roomName);
+        }
+      }, 1000);
     }
+    
+    
 
     function moveToNextSong(roomName) {
       clearInterval(songTimer);
@@ -236,6 +255,8 @@ io.on('connection', (socket) => {
       
       songs.shift();
       currentSongIndex[roomName]++;
+      clearInterval(songTimers[roomName]);
+      delete songTimers[roomName];
     
         if (songs.length > 0) {
           currentSong[roomName] = songs[0];
@@ -303,13 +324,21 @@ io.on('connection', (socket) => {
 
     function endGame(roomName) {
       clearInterval(songTimer);
-      io.to(roomName).emit('end', 'The game has ended due to a player disconnecting.');
+      clearInterval(songTimers[roomName]);
+      delete songTimers[roomName];
     
       // Clean up the game variables
       delete gameStarted[roomName];
       delete currentSong[roomName];
       delete guessesReceived[roomName];
       delete currentSongIndex[roomName];
+      delete playersReady[roomName];
+    
+      // Reset the scores for all users in the room
+      const usersInRoom = Array.from(io.sockets.adapter.rooms.get(roomName) || []);
+      usersInRoom.forEach((userId) => {
+        delete scores[userId];
+      });
     
       // Reset the songs array to the initial list
       songs = [...initialsongs];
